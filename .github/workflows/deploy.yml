@@ -1,0 +1,13 @@
+name: Deploy Pod
+
+on:
+  workflow_dispatch:  # Ejecuta manualmente desde GitHub
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # Usa el runner configurado
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run deploy script
+        run: bash deploy.sh
