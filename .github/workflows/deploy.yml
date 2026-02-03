@@ -54,8 +54,21 @@ jobs:
         run: |
           kind get kubeconfig > $HOME/.kube/config
 
+      - name: Install ingress-nginx for kind
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/kind/deploy.yaml
+
+      - name: Wait for ingress controller to be ready
+        run: |
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=Ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=120s
+
       - name: Sanity check
         run: kubectl get nodes
 
       - name: Deploy to local kind cluster
-        run: kubectl apply -f k8s/
+        run: |
+          cd $GITHUB_WORKSPACE
+          kubectl apply -f k8s/
