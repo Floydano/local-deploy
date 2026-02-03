@@ -78,6 +78,46 @@ jobs:
             --namespace=default \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Validate GHCR token permissions
+        run: |
+          echo "Probando acceso a GHCR con el token..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://ghcr.io/v2/)
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: El token no tiene permisos para acceder a GHCR (status $STATUS)"
+            exit 1
+          fi
+          echo "Token válido para GHCR."
+
+      - name: Validate GHCR pull secret content
+        run: |
+          echo "Validando contenido del secret ghcr-secret..."
+          DATA=$(kubectl get secret ghcr-secret -n default -o jsonpath='{.data.\.dockerconfigjson}')
+          if [ -z "$DATA" ]; then
+            echo "ERROR: El secret ghcr-secret está vacío."
+            exit 1
+          fi
+          echo "Secret ghcr-secret contiene credenciales."
+
+      - name: Test image pull inside cluster
+        run: |
+          echo "Probando pull de la imagen dentro del cluster..."
+          kubectl delete pod test-pull --ignore-not-found=true
+          kubectl run test-pull \
+            --image=ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest \
+            --restart=Never \
+            --image-pull-policy=Always
+          sleep 8
+          STATUS=$(kubectl get pod test-pull -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' || true)
+          if [ "$STATUS" = "ErrImagePull" ] || [ "$STATUS" = "ImagePullBackOff" ] || [ "$STATUS" = "Unauthorized" ]; then
+            echo "ERROR: El cluster NO puede hacer pull de la imagen desde GHCR."
+            kubectl describe pod test-pull
+            exit 1
+          fi
+          echo "Pull exitoso dentro del cluster."
+          kubectl delete pod test-pull --ignore-not-found=true
+
       - name: Sanity check
         run: |
           kubectl get nodes
