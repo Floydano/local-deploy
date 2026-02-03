@@ -47,7 +47,7 @@ jobs:
           if ! docker ps | grep -q kind-control-plane; then
             echo "kind-control-plane no está corriendo, recreando cluster..."
             kind delete cluster || true
-            kind create cluster
+            kind create cluster --config kind-config.yaml
           fi
 
       - name: Configure kubectl for local kind
@@ -63,12 +63,18 @@ jobs:
           kubectl wait --namespace ingress-nginx \
             --for=condition=Ready pod \
             --selector=app.kubernetes.io/component=controller \
-            --timeout=120s
+            --timeout=180s
 
       - name: Sanity check
-        run: kubectl get nodes
+        run: |
+          kubectl get nodes
+          kubectl get pods -A
 
       - name: Deploy to local kind cluster
         run: |
           cd $GITHUB_WORKSPACE
           kubectl apply -f k8s/
+
+      - name: Show resources
+        run: |
+          kubectl get pods,svc,ingress,pvc -A
