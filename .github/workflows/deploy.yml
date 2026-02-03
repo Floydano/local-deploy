@@ -69,12 +69,7 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=180s
 
-      - name: Sanity check
-        run: |
-          kubectl get nodes
-          kubectl get pods -A
-      
-      - name: Create GHCR pull secret in kind
+      - name: Create GHCR pull secret
         run: |
           kubectl create secret docker-registry ghcr-secret \
             --docker-server=ghcr.io \
@@ -82,6 +77,11 @@ jobs:
             --docker-password=${{ secrets.GITHUB_TOKEN }} \
             --namespace=default \
             --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Sanity check
+        run: |
+          kubectl get nodes
+          kubectl get pods -A
 
       - name: Deploy to local kind cluster
         run: |
