@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:  # Ejecuta manualmente desde GitHub
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   deploy:
     runs-on: self-hosted  # Usa el runner configurado
