@@ -1,4 +1,4 @@
-name: Hybrid Pipeline (kind + real cluster)
+name: Deploy to local kind
 
 on:
   push:
@@ -8,11 +8,9 @@ on:
 permissions:
   contents: read
   packages: write
-  id-token: write
 
 jobs:
-
-  test-kind:
+  deploy:
     runs-on: self-hosted
 
     steps:
@@ -44,36 +42,20 @@ jobs:
         with:
           version: 'v1.28.0'
 
+      - name: Ensure kind cluster is running
+        run: |
+          if ! docker ps | grep -q kind-control-plane; then
+            echo "kind-control-plane no está corriendo, recreando cluster..."
+            kind delete cluster || true
+            kind create cluster
+          fi
+
       - name: Configure kubectl for local kind
         run: |
           kind get kubeconfig > $HOME/.kube/config
 
+      - name: Sanity check
+        run: kubectl get nodes
+
       - name: Deploy to local kind cluster
-        run: kubectl apply -f k8s/
-
-      # Opcional: pruebas de integración
-      - name: Run integration tests
-        run: |
-          echo "Aquí puedes agregar pruebas contra el cluster kind"
-          kubectl get pods -A
-
-
-  deploy-prod:
-    runs-on: self-hosted
-    needs: test-kind
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.28.0'
-
-      - name: Configure kubectl for production cluster
-        run: |
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
-
-      - name: Deploy to production cluster
         run: kubectl apply -f k8s/
