@@ -24,4 +24,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ toLower(github.repository) }}/wordpress:latest
+          tags: ghcr.io/${{ github.repository }}/wordpress:latest
