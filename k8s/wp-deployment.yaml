@@ -20,6 +20,8 @@ spec:
       labels:
         app: wordpress
     spec:
+      imagePullSecrets:
+      - name: ghcr-secret
       containers:
       - name: wordpress
         image: ghcr.io/floydano/local-deploy/wordpress:latest

@@ -73,6 +73,15 @@ jobs:
         run: |
           kubectl get nodes
           kubectl get pods -A
+      
+      - name: Create GHCR pull secret in kind
+        run: |
+          kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --namespace=default \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to local kind cluster
         run: |
