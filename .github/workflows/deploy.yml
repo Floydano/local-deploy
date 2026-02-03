@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write  # Añadido para autenticación OIDC en clúster
 
 jobs:
   deploy:
@@ -31,3 +32,12 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+      - name: Deploy to cluster
+        run: kubectl apply -f k8s/
