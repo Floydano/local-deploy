@@ -54,6 +54,10 @@ jobs:
         run: |
           kind get kubeconfig > $HOME/.kube/config
 
+      - name: Label kind node for ingress
+        run: |
+          kubectl label node kind-control-plane ingress-ready=true --overwrite
+
       - name: Install ingress-nginx for kind
         run: |
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/kind/deploy.yaml
@@ -72,7 +76,6 @@ jobs:
 
       - name: Deploy to local kind cluster
         run: |
-          cd $GITHUB_WORKSPACE
           kubectl apply -f k8s/
 
       - name: Show resources
