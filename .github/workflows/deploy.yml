@@ -1,6 +1,8 @@
 name: Deploy Pod
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:  # Ejecuta manualmente desde GitHub
 
 jobs:
