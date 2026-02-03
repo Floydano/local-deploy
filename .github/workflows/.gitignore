@@ -1,0 +1,66 @@
+# ───────────────────────────────
+# Archivos del sistema
+# ───────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ───────────────────────────────
+# Logs
+# ───────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ───────────────────────────────
+# Entornos virtuales / dependencias
+# ───────────────────────────────
+node_modules/
+venv/
+.env
+.env.*
+
+# ───────────────────────────────
+# Compilados / builds
+# ───────────────────────────────
+dist/
+build/
+out/
+coverage/
+
+# ───────────────────────────────
+# Docker
+# ───────────────────────────────
+docker-data/
+*.pid
+
+# ───────────────────────────────
+# Kubernetes
+# ───────────────────────────────
+kubeconfig
+*.kubeconfig
+
+# ───────────────────────────────
+# Terraform
+# ───────────────────────────────
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.*
+crash.log
+
+# ───────────────────────────────
+# IDEs
+# ───────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ───────────────────────────────
+# Otros
+# ───────────────────────────────
+*.tmp
+*.bak
+*.sh

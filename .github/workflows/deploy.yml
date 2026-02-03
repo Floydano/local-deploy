@@ -1,43 +1,79 @@
-name: Deploy Pod
+name: Hybrid Pipeline (kind + real cluster)
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Ejecuta manualmente desde GitHub
+  workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
-  id-token: write  # Añadido para autenticación OIDC en clúster
+  id-token: write
 
 jobs:
-  deploy:
-    runs-on: self-hosted  # Usa el runner configurado
+
+  test-kind:
+    runs-on: self-hosted
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set lowercase repository name
         run: echo "LOWER_REPO=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.0'
-      - name: Configure kubectl
+
+      - name: Configure kubectl for local kind
+        run: |
+          kind get kubeconfig > $HOME/.kube/config
+
+      - name: Deploy to local kind cluster
+        run: kubectl apply -f k8s/
+
+      # Opcional: pruebas de integración
+      - name: Run integration tests
+        run: |
+          echo "Aquí puedes agregar pruebas contra el cluster kind"
+          kubectl get pods -A
+
+
+  deploy-prod:
+    runs-on: self-hosted
+    needs: test-kind
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl for production cluster
         run: |
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
-      - name: Deploy to cluster
+
+      - name: Deploy to production cluster
         run: kubectl apply -f k8s/
