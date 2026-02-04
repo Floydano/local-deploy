@@ -14,31 +14,31 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # -----------------------------
-      # 1. Checkout
-      # -----------------------------
+      # -----------------------------------------
+      # 1. Checkout repository
+      # -----------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2. Normalizar nombre del repo
-      # -----------------------------
-      - name: Set lowercase repository name
+      # -----------------------------------------
+      # 2. Normalize repository name (lowercase)
+      # -----------------------------------------
+      - name: Normalize repository name
         run: echo "LOWER_REPO=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      # -----------------------------
-      # 3. Login GHCR (GITHUB_TOKEN)
-      # -----------------------------
-      - name: Log in to GitHub Container Registry
+      # -----------------------------------------
+      # 3. Login to GHCR using GitHub token
+      # -----------------------------------------
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # -----------------------------
-      # 4. Build & Push optimizado
-      # -----------------------------
+      # -----------------------------------------
+      # 4. Build & push Docker image with cache
+      # -----------------------------------------
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -48,44 +48,44 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # -----------------------------
-      # 5. Instalar kubectl
-      # -----------------------------
+      # -----------------------------------------
+      # 5. Install kubectl
+      # -----------------------------------------
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.0'
 
-      # -----------------------------
-      # 6. Asegurar cluster kind
-      # -----------------------------
+      # -----------------------------------------
+      # 6. Ensure kind cluster exists
+      # -----------------------------------------
       - name: Ensure kind cluster is running
         run: |
           if ! docker ps | grep -q kind-control-plane; then
-            echo "Cluster no existe, creando..."
+            echo "Cluster not found, creating..."
             kind delete cluster || true
             kind create cluster --config kind-config.yaml
           else
-            echo "Cluster ya existe."
+            echo "Cluster already exists."
           fi
 
-      # -----------------------------
-      # 7. Exportar kubeconfig
-      # -----------------------------
-      - name: Configure kubectl for local kind
+      # -----------------------------------------
+      # 7. Export kubeconfig for kubectl
+      # -----------------------------------------
+      - name: Configure kubectl for kind
         run: |
           kind export kubeconfig --name kind
 
-      # -----------------------------
-      # 8. Instalar ingress-nginx solo si no existe
-      # -----------------------------
+      # -----------------------------------------
+      # 8. Install ingress-nginx if missing
+      # -----------------------------------------
       - name: Ensure ingress-nginx installed
         run: |
           if ! kubectl get ns ingress-nginx >/dev/null 2>&1; then
-            echo "Instalando ingress-nginx..."
+            echo "Installing ingress-nginx..."
             kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/kind/deploy.yaml
           else
-            echo "Ingress-nginx ya instalado."
+            echo "ingress-nginx already installed."
           fi
 
       - name: Wait for ingress controller
@@ -95,11 +95,15 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=180s
 
-      # -----------------------------
-      # 9. Crear secret GHCR (idempotente)
-      # -----------------------------
-      - name: Create GHCR pull secret
+      # -----------------------------------------
+      # 9. Create namespace + GHCR secret (unified)
+      # -----------------------------------------
+      - name: Ensure namespace and GHCR secret exist
         run: |
+          # Namespace (idempotent)
+          kubectl create ns local-deploy --dry-run=client -o yaml | kubectl apply -f -
+
+          # GHCR pull secret (idempotent)
           kubectl create secret docker-registry ghcr-secret \
             --docker-server=ghcr.io \
             --docker-username=${{ github.actor }} \
@@ -108,42 +112,11 @@ jobs:
             --namespace=local-deploy \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      # -----------------------------
-      # 10. Test de pull dentro del cluster
-      # -----------------------------
-      #- name: Test GHCR pull inside cluster
-      #  run: |
-      #    kubectl delete pod test-pull --ignore-not-found=true
-      #    kubectl run test-pull \
-      #      --image=ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest \
-      #      --restart=Never \
-      #      --image-pull-policy=Always \
-      #      --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}'
-
-      #    kubectl wait pod/test-pull --for=condition=Ready --timeout=60s || {
-      #      echo "ERROR: El cluster NO puede hacer pull de la imagen."
-      #      kubectl describe pod test-pull
-      #      exit 1
-      #    }
-
-      #    echo "Pull exitoso dentro del cluster."
-      #    kubectl delete pod test-pull --ignore-not-found=true
-
-      # -----------------------------
-      # 11. Deploy real
-      # -----------------------------
-      - name: Apply Kubernetes manifests (namespace first)
-        run: |
-          echo "Asegurando namespace local-deploy..."
-          kubectl get ns local-deploy >/dev/null 2>&1 || kubectl create ns local-deploy
-
-          echo "Aplicando manifests..."
           kubectl apply -f k8s/
 
-
-      # -----------------------------
-      # 12. Mostrar recursos
-      # -----------------------------
+      # -----------------------------------------
+      # 10. Show cluster resources
+      # -----------------------------------------
       - name: Show resources
         run: |
           kubectl get pods,svc,ingress,pvc -A
