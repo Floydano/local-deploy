@@ -14,119 +14,131 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # -----------------------------
+      # 1. Checkout
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. Normalizar nombre del repo
+      # -----------------------------
       - name: Set lowercase repository name
         run: echo "LOWER_REPO=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      # -----------------------------
+      # 3. Login GHCR (GITHUB_TOKEN)
+      # -----------------------------
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      # -----------------------------
+      # 4. Build & Push optimizado
+      # -----------------------------
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
+      # -----------------------------
+      # 5. Instalar kubectl
+      # -----------------------------
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.0'
 
+      # -----------------------------
+      # 6. Asegurar cluster kind
+      # -----------------------------
       - name: Ensure kind cluster is running
         run: |
           if ! docker ps | grep -q kind-control-plane; then
-            echo "kind-control-plane no está corriendo, recreando cluster..."
+            echo "Cluster no existe, creando..."
             kind delete cluster || true
             kind create cluster --config kind-config.yaml
+          else
+            echo "Cluster ya existe."
           fi
 
+      # -----------------------------
+      # 7. Exportar kubeconfig
+      # -----------------------------
       - name: Configure kubectl for local kind
         run: |
-          kind get kubeconfig > $HOME/.kube/config
+          kind export kubeconfig --name kind
 
-      - name: Label kind node for ingress
+      # -----------------------------
+      # 8. Instalar ingress-nginx solo si no existe
+      # -----------------------------
+      - name: Ensure ingress-nginx installed
         run: |
-          kubectl label node kind-control-plane ingress-ready=true --overwrite
+          if ! kubectl get ns ingress-nginx >/dev/null 2>&1; then
+            echo "Instalando ingress-nginx..."
+            kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/kind/deploy.yaml
+          else
+            echo "Ingress-nginx ya instalado."
+          fi
 
-      - name: Install ingress-nginx for kind
-        run: |
-          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/kind/deploy.yaml
-
-      - name: Wait for ingress controller to be ready
+      - name: Wait for ingress controller
         run: |
           kubectl wait --namespace ingress-nginx \
             --for=condition=Ready pod \
             --selector=app.kubernetes.io/component=controller \
             --timeout=180s
 
+      # -----------------------------
+      # 9. Crear secret GHCR (idempotente)
+      # -----------------------------
       - name: Create GHCR pull secret
         run: |
           kubectl create secret docker-registry ghcr-secret \
             --docker-server=ghcr.io \
             --docker-username=${{ github.actor }} \
-            --docker-password=${{ secrets.GHCR_PAT }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --docker-email=none@example.com \
             --namespace=default \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Validate GHCR token permissions
+      # -----------------------------
+      # 10. Test de pull dentro del cluster
+      # -----------------------------
+      - name: Test GHCR pull inside cluster
         run: |
-          echo "Probando acceso a GHCR con el token..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GHCR_PAT }}" \
-            https://ghcr.io/v2/)
-          if [ "$STATUS" != "200" ]; then
-            echo "ERROR: El token no tiene permisos para acceder a GHCR (status $STATUS)"
-            exit 1
-          fi
-          echo "Token válido para GHCR."
-
-      - name: Validate GHCR pull secret content
-        run: |
-          echo "Validando contenido del secret ghcr-secret..."
-          DATA=$(kubectl get secret ghcr-secret -n default -o jsonpath='{.data.\.dockerconfigjson}')
-          if [ -z "$DATA" ]; then
-            echo "ERROR: El secret ghcr-secret está vacío."
-            exit 1
-          fi
-          echo "Secret ghcr-secret contiene credenciales."
-
-      - name: Test image pull inside cluster
-        run: |
-          echo "Probando pull de la imagen dentro del cluster..."
           kubectl delete pod test-pull --ignore-not-found=true
           kubectl run test-pull \
             --image=ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest \
             --restart=Never \
-            --image-pull-policy=Always
-          sleep 8
-          STATUS=$(kubectl get pod test-pull -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' || true)
-          if [ "$STATUS" = "ErrImagePull" ] || [ "$STATUS" = "ImagePullBackOff" ] || [ "$STATUS" = "Unauthorized" ]; then
-            echo "ERROR: El cluster NO puede hacer pull de la imagen desde GHCR."
+            --image-pull-policy=Always \
+            --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}'
+
+          kubectl wait pod/test-pull --for=condition=Ready --timeout=60s || {
+            echo "ERROR: El cluster NO puede hacer pull de la imagen."
             kubectl describe pod test-pull
             exit 1
-          fi
+          }
+
           echo "Pull exitoso dentro del cluster."
           kubectl delete pod test-pull --ignore-not-found=true
 
-      - name: Sanity check
-        run: |
-          kubectl get nodes
-          kubectl get pods -A
-
+      # -----------------------------
+      # 11. Deploy real
+      # -----------------------------
       - name: Deploy to local kind cluster
         run: |
           kubectl apply -f k8s/
 
+      # -----------------------------
+      # 12. Mostrar recursos
+      # -----------------------------
       - name: Show resources
         run: |
           kubectl get pods,svc,ingress,pvc -A
