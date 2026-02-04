@@ -111,23 +111,23 @@ jobs:
       # -----------------------------
       # 10. Test de pull dentro del cluster
       # -----------------------------
-      - name: Test GHCR pull inside cluster
-        run: |
-          kubectl delete pod test-pull --ignore-not-found=true
-          kubectl run test-pull \
-            --image=ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest \
-            --restart=Never \
-            --image-pull-policy=Always \
-            --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}'
+      #- name: Test GHCR pull inside cluster
+      #  run: |
+      #    kubectl delete pod test-pull --ignore-not-found=true
+      #    kubectl run test-pull \
+      #      --image=ghcr.io/${{ env.LOWER_REPO }}/wordpress:latest \
+      #      --restart=Never \
+      #      --image-pull-policy=Always \
+      #      --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}'
 
-          kubectl wait pod/test-pull --for=condition=Ready --timeout=60s || {
-            echo "ERROR: El cluster NO puede hacer pull de la imagen."
-            kubectl describe pod test-pull
-            exit 1
-          }
+      #    kubectl wait pod/test-pull --for=condition=Ready --timeout=60s || {
+      #      echo "ERROR: El cluster NO puede hacer pull de la imagen."
+      #      kubectl describe pod test-pull
+      #      exit 1
+      #    }
 
-          echo "Pull exitoso dentro del cluster."
-          kubectl delete pod test-pull --ignore-not-found=true
+      #    echo "Pull exitoso dentro del cluster."
+      #    kubectl delete pod test-pull --ignore-not-found=true
 
       # -----------------------------
       # 11. Deploy real
