@@ -17,7 +17,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: wordpress
-          image: ghcr.io/floydano/local-deploy:latest
+          image: ghcr.io/floydano/local-deploy:1
           imagePullPolicy: Always
           ports:
             - containerPort: 80
