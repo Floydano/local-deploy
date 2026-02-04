@@ -105,7 +105,7 @@ jobs:
             --docker-username=${{ github.actor }} \
             --docker-password=${{ secrets.GITHUB_TOKEN }} \
             --docker-email=none@example.com \
-            --namespace=default \
+            --namespace=local-deploy \
             --dry-run=client -o yaml | kubectl apply -f -
 
       # -----------------------------

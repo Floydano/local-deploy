@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: wp-pv
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: wp-storage
+  hostPath:
+    path: /data/wp
+  persistentVolumeReclaimPolicy: Retain
