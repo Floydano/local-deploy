@@ -32,16 +32,16 @@ spec:
               path: /
               port: 80
             initialDelaySeconds: 60
-            periodSeconds: 5
-            timeoutSeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 90
-            periodSeconds: 10
-            timeoutSeconds: 3
+            periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
       volumes:
         - name: wp-data
