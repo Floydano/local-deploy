@@ -26,7 +26,7 @@ spec:
                 name: wp-env
           volumeMounts:
             - name: wp-data
-              mountPath: /var/www/html
+              mountPath: /var/www/html/wp-content
           readinessProbe:
             httpGet:
               path: /

@@ -3,15 +3,13 @@ kind: Ingress
 metadata:
   name: wordpress
   namespace: local-deploy
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
     - host: wordpress.local
       http:
         paths:
-          - path: /wp
+          - path: /
             pathType: Prefix
             backend:
               service:
