@@ -112,7 +112,7 @@ jobs:
             --namespace=local-deploy \
             --dry-run=client -o yaml | kubectl apply -f -
 
-          kubectl apply -f k8s/
+          kubectl apply -f k8sold/
 
       # -----------------------------------------
       # 10. Show cluster resources
