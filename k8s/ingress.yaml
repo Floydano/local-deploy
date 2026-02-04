@@ -11,7 +11,7 @@ spec:
     - host: wordpress.local
       http:
         paths:
-          - path: /
+          - path: /wp
             pathType: Prefix
             backend:
               service:
