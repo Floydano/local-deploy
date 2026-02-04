@@ -132,9 +132,14 @@ jobs:
       # -----------------------------
       # 11. Deploy real
       # -----------------------------
-      - name: Deploy to local kind cluster
+      - name: Apply Kubernetes manifests (namespace first)
         run: |
+          echo "Asegurando namespace local-deploy..."
+          kubectl get ns local-deploy >/dev/null 2>&1 || kubectl create ns local-deploy
+
+          echo "Aplicando manifests..."
           kubectl apply -f k8s/
+
 
       # -----------------------------
       # 12. Mostrar recursos
